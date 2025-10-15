@@ -1,0 +1,16 @@
+Stability Test Report
+Implementation: threading
+============================================================
+
+Duration: 0.01 hours
+Operations: 409
+Exceptions: 0
+Crashes: 0
+GC collections: 4
+
+Memory:
+  Start free: 443,456
+  End free: 438,144
+  Min free: 443,456
+  Max allocated: 13,616
+

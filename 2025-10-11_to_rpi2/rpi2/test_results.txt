@@ -1,0 +1,153 @@
+2025-10-14
+
+<test_slave.py test>
+test_slave.py
+
+notes: completes properly, but ends with black screen and white text on full refresh, and should be white screen and black text.
+
+
+<results>
+MPY: soft reboot
+
+=======================================================
+  SLAVE PICO 2W HARDWARE INTEGRATION TEST SUITE
+=======================================================
+Date: (2025, 10, 14, 16, 35, 49, 1, 287)
+Board: Raspberry Pi Pico 2W (RP2350)
+=======================================================
+
+[1/14] GPIO Pin Configuration... ✓ PASS (2ms)
+    All 8 GPIO pins accessible
+[2/14] SPI Bus Initialization... ✓ PASS (1ms)
+    SPI1 initialized on GP10/GP11 @ 4MHz
+[3/14] SPI Write Operations... ✓ PASS (1ms)
+    SPI write OK (4 bytes)
+[4/14] Chip Select Pin (GP13)... ✓ PASS (21ms)
+    CS pin functional (currently HIGH)
+[5/14] Data/Command Pin (GP14)... ✓ PASS (21ms)
+    DC pin functional (currently HIGH - data mode)
+[6/14] Reset Pin (GP15)... ✓ PASS (30ms)
+    RST pin functional (currently HIGH - normal)
+[7/14] BUSY Status Pin (GP16)... ✓ PASS (1ms)
+    BUSY pin LOW (display idle)
+[8/14] E-ink Display Initialization...
+    (Display init takes 5-10 seconds...)e-Paper busy
+e-Paper busy release
+e-Paper busy
+e-Paper busy release
+e-Paper busy
+e-Paper busy release
+e-Paper busy
+e-Paper busy release
+ ✓ PASS (3196ms)
+    Display initialized: 400x300px
+[9/14] Framebuffer Operations... ✓ PASS (10ms)
+    Framebuffer operations OK (text, rect)
+[10/14] Partial Display Refresh...
+    (Partial refresh takes 1-2 seconds...)e-Paper busy
+e-Paper busy release
+ ✓ PASS (550ms)
+    Partial refresh completed
+[11/14] Full Display Refresh...
+    (Full refresh takes 3-5 seconds...)e-Paper busy
+e-Paper busy release
+ ✓ PASS (584ms)
+    Full refresh completed
+[12/14] Display BUSY Signal Reading... ✓ PASS (2ms)
+    BUSY signal reads correctly (idle)
+[13/14] UART Initialization... ✓ PASS (5ms)
+    UART1 initialized on GP8/GP9 @ 115200 baud
+[14/14] UART Loopback Test... ✗ FAIL (51ms)
+    No loopback data received - connect GP8 to GP9 for this test
+[15/14] JSON Command Parsing... ✓ PASS (2ms)
+    JSON parsing OK (77 bytes)
+
+=======================================================
+  RESULTS: 14/15 PASSED
+  FAILED: 1 tests
+=======================================================
+
+NOTES:
+• Display tests may take 10-15 seconds total
+• For UART loopback test: connect GP8 (TX) to GP9 (RX)
+• Remove loopback wire before connecting to Master Pico
+• You should see 'PARTIAL' and 'FULL REFRESH' on the display
+• All tests use SPI1 and UART1 as per wiring guide
+
+>>> 
+</results>
+
+</test_slave.py test>
+
+<test_slave_unit.py test>
+
+MPY: soft reboot
+
+=======================================================
+  SLAVE PICO APPLICATION UNIT TEST SUITE
+=======================================================
+
+═ TextLayout Tests ═
+Testing: Word wrap (short text)... ✓ PASS
+  Short text fits on 1 line
+Testing: Word wrap (long word)... ✓ PASS
+  Long word split across 5 lines
+Testing: Pagination (empty text)... ✓ PASS
+  Empty text produces 1 empty page
+Testing: Pagination (with newlines)... ✓ PASS
+  All 15 characters paginated
+
+═ UART Command Structure Tests ═
+Testing: INIT command... ✓ PASS
+  INIT command structure valid
+Testing: RENDER_TEXT command... ✓ PASS
+  RENDER_TEXT command structure valid
+Testing: SHOW_SCREENSAVER command... ✓ PASS
+  SHOW_SCREENSAVER command structure valid
+Testing: WAKE_UP command... ✓ PASS
+  WAKE_UP command structure valid
+Testing: POWER_OFF command... ✓ PASS
+  POWER_OFF command structure valid
+Testing: CLEAR command... ✓ PASS
+  CLEAR command structure valid
+Testing: STATUS command... ✓ PASS
+  STATUS command structure valid
+
+═ Command Handler Logic Tests ═
+Testing: INIT handler logic... ✓ PASS
+  Init set dimensions: 400x300
+Testing: RENDER_TEXT handler logic... ✓ PASS
+  Render command parsed: 'Test' at (10, 20)
+Testing: STATUS handler logic... ✓ PASS
+  Status message: 'Saved'
+
+═ Response Structure Tests ═
+Testing: OK response... ✓ PASS
+  OK response structure valid
+Testing: Error response... ✓ PASS
+  Error response structure valid
+
+═ JSON Protocol Tests ═
+Testing: JSON serialization... ✓ PASS
+  JSON serialization OK (39 bytes)
+Testing: JSON with newline... ✓ PASS
+  JSON with newline terminator OK
+Testing: JSON unicode handling... ✓ PASS
+  Unicode handling OK
+
+═ Display Buffer Logic Tests ═
+Testing: Cursor render bounds... ✓ PASS
+  Cursor bounds OK: (50, 113, 8, 2)
+Testing: Text render coordinates... ✓ PASS
+  All 2 characters have valid coordinates
+
+═ Command Dispatcher Tests ═
+Testing: Dispatcher (valid command)... ✓ PASS
+  Valid command dispatched correctly
+Testing: Dispatcher (invalid command)... ✓ PASS
+  Invalid command correctly rejected
+
+=======================================================
+  RESULTS: 23/23 PASSED
+=======================================================
+</test_slave_unit.py test>

@@ -1,0 +1,608 @@
+# 2025-07-28
+- New architecture works as is. 
+
+Next: Improve sleep initialization: use deep sleep. 
+
+# 2025-07-21 LAtest Update:
+
+Need to fix slight bugs. Sleep to Linson and waking.
+
+## Comprehensive State Summary with Word Wrap and Metadata Issues
+
+### Current Architecture:
+1. **Document Structure**:
+   - `Document` class manages pages and cursor position
+   - `Page` class stores characters as a list
+   - Display lines are calculated on-demand for rendering
+   - Metadata saves cursor position but not reliably
+
+2. **Current Word Wrap Issue**:
+   - When typing at end of line, the word should move to next line as a unit
+   - Currently seeing incomplete word wrapping (missing first character)
+   - Line cache may not be properly rebuilt after character insertion
+
+3. **Metadata Issues**:
+   - Need to track cursor position per page
+   - Need to handle page/subpage navigation state
+   - Should persist view preferences and editing state
+
+---
+
+## Complete Fix Implementation
+
+### 1. Fix Word Wrap Display Logic in `document.py`:
+
+```python
+# In document.py - Page class
+def get_display_lines(self, chars_per_line):
+    """Calculate display lines with proper word wrap"""
+    # Always recalculate for now to ensure correctness
+    lines = []
+    current_line = []
+    current_word = []
+    
+    i = 0
+    while i < len(self.chars):
+        char = self.chars[i]
+        
+        if char == '\n':
+            # Add current word to line, then break
+            if current_word:
+                current_line.extend(current_word)
+                current_word = []
+            lines.append(current_line)
+            current_line = []
+        elif char == ' ':
+            # Complete the current word
+            if current_word:
+                # Check if word + space fits
+                word_with_space = current_word + [' ']
+                if len(current_line) + len(word_with_space) <= chars_per_line:
+                    # Add word and space to current line
+                    current_line.extend(word_with_space)
+                else:
+                    # Line would overflow - finish current line and start new
+                    if current_line:  # Only append if line has content
+                        lines.append(current_line)
+                    current_line = current_word + [' ']
+                current_word = []
+            else:
+                # Just a space - add if fits, otherwise new line
+                if len(current_line) < chars_per_line:
+                    current_line.append(' ')
+                else:
+                    lines.append(current_line)
+                    current_line = [' ']
+        else:
+            # Regular character - add to word
+            current_word.append(char)
+            
+            # Check if current line + word exceeds limit
+            if len(current_line) + len(current_word) > chars_per_line:
+                if current_line:
+                    # Push current line and start fresh with the word
+                    lines.append(current_line)
+                    current_line = []
+                elif len(current_word) > chars_per_line:
+                    # Word is too long - break it
+                    while len(current_word) > chars_per_line:
+                        lines.append(current_word[:chars_per_line])
+                        current_word = current_word[chars_per_line:]
+        
+        i += 1
+    
+    # Handle remaining content
+    if current_word:
+        if len(current_line) + len(current_word) <= chars_per_line:
+            current_line.extend(current_word)
+        else:
+            if current_line:
+                lines.append(current_line)
+            current_line = current_word
+    
+    if current_line:
+        lines.append(current_line)
+    
+    # Cache the result
+    self._line_cache = lines
+    debug("Display lines: %d lines from %d chars" % (len(lines), len(self.chars)))
+    return lines
+
+def insert_char(self, pos, char):
+    """Insert character at position"""
+    self.chars.insert(pos, char)
+    self._cache_dirty = True
+    self._line_cache = None  # Force display line recalculation
+    debug("Inserted '%s' at pos %d, page now has %d chars" % (repr(char), pos, len(self.chars)))
+    return pos + 1
+
+def delete_char(self, pos):
+    """Delete character at position"""
+    if 0 < pos <= len(self.chars):
+        deleted = self.chars.pop(pos - 1)
+        self._cache_dirty = True
+        self._line_cache = None  # Force display line recalculation
+        debug("Deleted '%s' at pos %d, page now has %d chars" % (repr(deleted), pos-1, len(self.chars)))
+        return pos - 1, deleted
+    return pos, None
+```
+
+### 2. Enhanced Metadata Structure in `document.py`:
+
+```python
+def _save_metadata(self):
+    """Save comprehensive document metadata"""
+    metadata = {
+        'version': 2,  # Metadata version for future compatibility
+        'current_page': self.current_page_idx,
+        'cursor_pos': self.cursor_pos,
+        'page_count': len(self.pages),
+        'timestamp': time.time(),
+        'page_info': [],
+        'view_state': {
+            'last_view_page': getattr(self, 'last_view_page', 0),
+            'last_edit_time': time.time()
+        }
+    }
+    
+    # Save per-page information
+    for idx, page in enumerate(self.pages):
+        page_data = {
+            'index': idx,
+            'explicit_break': page.explicit_break,
+            'char_count': len(page.chars),
+            'line_count': len(page.get_display_lines(self.display_metrics.chars_per_line)) if self.display_metrics else 0,
+            'first_chars': ''.join(page.chars[:20]) if page.chars else '',  # Preview
+            'last_cursor': getattr(page, 'last_cursor_pos', 0)  # Track last cursor per page
+        }
+        metadata['page_info'].append(page_data)
+    
+    meta_path = self.filepath.replace('.txt', '.meta')
+    try:
+        f = open(meta_path, 'w')
+        f.write(json.dumps(metadata, indent=2))
+        f.close()
+        debug("Metadata saved: %d pages, current page %d" % (len(self.pages), self.current_page_idx))
+    except Exception as e:
+        debug("Metadata save failed: %s" % e)
+
+def _load_metadata(self):
+    """Load document metadata with migration support"""
+    meta_path = self.filepath.replace('.txt', '.meta')
+    try:
+        f = open(meta_path, 'r')
+        content = f.read()
+        f.close()
+        metadata = json.loads(content)
+        
+        # Apply metadata
+        self.current_page_idx = metadata.get('current_page', 0)
+        self.cursor_pos = metadata.get('cursor_pos', 0)
+        
+        # Load per-page data if available
+        if 'page_info' in metadata:
+            for page_data in metadata.get('page_info', []):
+                idx = page_data.get('index', 0)
+                if idx < len(self.pages):
+                    self.pages[idx].last_cursor_pos = page_data.get('last_cursor', 0)
+        
+        # Validate indices
+        if self.current_page_idx >= len(self.pages):
+            self.current_page_idx = len(self.pages) - 1
+        if self.current_page_idx < 0:
+            self.current_page_idx = 0
+            
+        current_page = self.pages[self.current_page_idx] if self.pages else None
+        if current_page and self.cursor_pos > len(current_page.chars):
+            self.cursor_pos = len(current_page.chars)
+        
+        debug("Metadata loaded: version %d, page %d/%d, cursor %d" % 
+              (metadata.get('version', 1), self.current_page_idx, len(self.pages), self.cursor_pos))
+    except Exception as e:
+        debug("No metadata or load failed: %s" % e)
+        # Default positioning
+        if self.pages:
+            self.current_page_idx = len(self.pages) - 1
+            self.cursor_pos = len(self.pages[-1].chars)
+        else:
+            self.current_page_idx = 0
+            self.cursor_pos = 0
+```
+
+### 3. Fix Real-time Word Wrap During Typing:
+
+Add this to `document.py` to handle word wrap as you type:
+
+```python
+def insert_char(self, char):
+    """Insert character with real-time word wrap checking"""
+    page = self.get_current_page()
+    
+    # Insert the character
+    self.cursor_pos = page.insert_char(self.cursor_pos, char)
+    self.dirty = True
+    
+    # If we just typed a character (not space), check if we need to wrap the current word
+    if char != ' ' and char != '\n' and self.display_metrics:
+        # Find current word boundaries
+        word_start = self.cursor_pos - 1
+        while word_start > 0 and page.chars[word_start - 1] not in [' ', '\n']:
+            word_start -= 1
+        
+        # Calculate current line position
+        line_start = word_start
+        while line_start > 0 and page.chars[line_start - 1] != '\n':
+            line_start -= 1
+        
+        # Count characters on current line up to cursor
+        chars_on_line = 0
+        for i in range(line_start, self.cursor_pos):
+            chars_on_line += 1
+        
+        # If we exceeded line length, wrap the whole word
+        if chars_on_line > self.display_metrics.chars_per_line:
+            # Insert newline before the word
+            page.chars.insert(word_start, '\n')
+            page._cache_dirty = True
+            page._line_cache = None
+            self.cursor_pos += 1  # Adjust cursor for inserted newline
+            debug("Auto-wrapped word at position %d" % word_start)
+```
+
+### 4. Update Display to Handle Cursor Position Correctly:
+
+In `display.py`, improve cursor tracking:
+
+```python
+def _find_cursor_position_from_lines(self, lines, cursor_pos):
+    """Find cursor x,y position with accurate character counting"""
+    char_count = 0
+    
+    for line_idx, line in enumerate(lines):
+        line_chars = len(line)
+        
+        # Check if cursor is within this line
+        if char_count <= cursor_pos <= char_count + line_chars:
+            char_in_line = cursor_pos - char_count
+            
+            # Calculate x position
+            if char_in_line >= len(line):
+                # Cursor at end of line
+                if len(line) >= self.chars_per_line:
+                    # Full line - wrap to next
+                    x = self.margin_x
+                    y = self.margin_y + ((line_idx + 1) * self.char_h)
+                else:
+                    # End of partial line
+                    x = self.margin_x + (len(line) * self.char_w)
+                    y = self.margin_y + (line_idx * self.char_h)
+            else:
+                # Cursor within line
+                x = self.margin_x + (char_in_line * self.char_w)
+                y = self.margin_y + (line_idx * self.char_h)
+            
+            # Ensure cursor stays within display bounds
+            if y + self.char_h > self.height - self.margin_y:
+                return None, None  # Cursor off screen
+            
+            return x, y
+        
+        # Account for newline at end of line (except last line)
+        char_count += line_chars
+        if line_idx < len(lines) - 1 or (line_idx < len(lines) - 1 and len(line) == self.chars_per_line):
+            char_count += 1  # Implicit newline
+    
+    # Cursor beyond all text - position at end
+    if lines:
+        last_line = lines[-1]
+        if len(last_line) >= self.chars_per_line:
+            x = self.margin_x
+            y = self.margin_y + (len(lines) * self.char_h)
+        else:
+            x = self.margin_x + (len(last_line) * self.char_w)
+            y = self.margin_y + ((len(lines) - 1) * self.char_h)
+    else:
+        x = self.margin_x
+        y = self.margin_y
+    
+    return x, y
+```
+
+### Summary of Fixes:
+
+1. **Word Wrap**: Fixed the display line calculation to properly handle word boundaries
+2. **Metadata**: Enhanced to track per-page cursor positions and view state
+3. **Real-time Wrap**: Added auto-wrapping during typing (optional - you may want to keep it display-only)
+4. **Cursor Tracking**: Improved cursor position calculation for wrapped lines
+
+The key insight is maintaining separation between:
+- **Storage format**: Clean text without display formatting
+- **Display format**: Word-wrapped lines for visual presentation
+- **Metadata**: Rich state tracking for navigation and recovery
+
+## Comprehensive Summary of Current State
+
+### What We've Accomplished:
+1. **Migrated to class-based architecture** with separated concerns:
+   - `main.py` - Main application logic and keyboard handling
+   - `document.py` - Document/Page models with text storage
+   - `display.py` - Display rendering and refresh logic
+   - `filemanager.py` - File operations
+
+2. **Fixed key handling issues**:
+   - Shift key no longer sticks (separated press/release tracking)
+   - Smooth typing restored with delayed refresh (500ms after last keystroke)
+   - Fn key sleep detection now works with interrupt-driven approach
+
+3. **Fixed word wrapping**:
+   - Words now wrap properly at line boundaries
+   - Text is stored cleanly without display formatting
+   - Files save without artificial line breaks
+
+### Current Issues:
+1. **Space key rendering bug**: Spaces don't appear to separate words until a second space is pressed
+2. **Navigation issues**: 
+   - Home key should return to editing position, not create new cursor position
+   - Page navigation state isn't properly maintained
+
+### Root Causes:
+1. **Space rendering**: The display line cache isn't being invalidated when spaces are inserted
+2. **Navigation state**: The page view mode isn't properly tracking return-to-edit position
+
+---
+
+## Fixes for Current Issues
+
+### 1. Fix Space Rendering Issue
+
+The problem is in `Page.insert_char()` - it's not clearing the line cache when characters are inserted:
+
+```python
+# In document.py - Page class
+def insert_char(self, pos, char):
+    """Insert character at position"""
+    self.chars.insert(pos, char)
+    self._cache_dirty = True
+    self._line_cache = None  # ADD THIS LINE - force recalculation of display lines
+    debug("Inserted '%s' at pos %d, page now has %d chars" % (char, pos, len(self.chars)))
+    return pos + 1
+
+def delete_char(self, pos):
+    """Delete character at position"""
+    if 0 < pos <= len(self.chars):
+        deleted = self.chars.pop(pos - 1)
+        self._cache_dirty = True
+        self._line_cache = None  # ADD THIS LINE - force recalculation
+        debug("Deleted '%s' at pos %d, page now has %d chars" % (deleted, pos-1, len(self.chars)))
+        return pos - 1, deleted
+    debug("Delete failed: pos=%d, len=%d" % (pos, len(self.chars)))
+    return pos, None
+```
+
+### 2. Fix Navigation/Home Key Behavior
+
+In `main.py`, we need to track editing state properly:
+
+```python
+# In WritersDeck class, add to __init__:
+self.in_page_view = False
+self.page_view_index = 0
+self.page_view_return_index = 0
+self.page_view_return_cursor = 0
+
+# Update _handle_navigation method:
+def _handle_navigation(self, key):
+    """Handle page navigation"""
+    debug("Navigation: %s" % key)
+    
+    if key == 'Home':
+        if self.in_page_view:
+            # Return to editing at saved position
+            self.in_page_view = False
+            self.document.current_page_idx = self.page_view_return_index
+            self.document.cursor_pos = self.page_view_return_cursor
+            debug("Returned to editing at page %d, cursor %d" % 
+                  (self.document.current_page_idx, self.document.cursor_pos))
+            self._show_status("Resumed editing")
+        else:
+            # Go to last page for editing
+            pages = self.document.pages
+            if pages:
+                self.document.current_page_idx = len(pages) - 1
+                last_page = pages[-1]
+                self.document.cursor_pos = len(last_page.chars)
+                debug("Moved to last page for editing")
+        self.display.needs_refresh = True
+        return
+    
+    # For PgUp/PgDn, enter page view mode if not already in it
+    if not self.in_page_view:
+        self.in_page_view = True
+        self.page_view_return_index = self.document.current_page_idx
+        self.page_view_return_cursor = self.document.cursor_pos
+        self.page_view_index = self.document.current_page_idx
+        debug("Entered page view mode from page %d" % self.page_view_index)
+    
+    if key == 'PgUp':
+        if self.page_view_index > 0:
+            self.page_view_index -= 1
+            self.document.current_page_idx = self.page_view_index
+            self.document.cursor_pos = 0  # View mode - cursor at start
+            debug("Page view: moved to page %d" % self.page_view_index)
+        else:
+            self._show_status("Already at first page")
+    elif key == 'PgDn':
+        if self.page_view_index < len(self.document.pages) - 1:
+            self.page_view_index += 1
+            self.document.current_page_idx = self.page_view_index
+            self.document.cursor_pos = 0  # View mode - cursor at start
+            debug("Page view: moved to page %d" % self.page_view_index)
+        else:
+            self._show_status("Already at last page")
+    
+    self.display.needs_refresh = True
+```
+
+### 3. Update Display to Show Page View Mode
+
+In `display.py`, add visual indication of page view mode:
+
+```python
+def render_page(self, page, cursor_pos, show_status=None, view_mode=False):
+    """Render a page of text with cursor"""
+    debug("Rendering page with %d chars, cursor at %d, view_mode=%s" % 
+          (len(page.chars), cursor_pos, view_mode))
+    
+    self.clear()
+    
+    # Get display lines (with word wrap applied)
+    lines = page.get_display_lines(self.chars_per_line)
+    
+    # Draw lines
+    y = self.margin_y
+    for line in lines:
+        if y + self.char_h > self.height - self.margin_y:
+            break
+        
+        x = self.margin_x
+        for char in line:
+            self.epd.image1Gray.text(char, x, y, self.epd.black)
+            x += self.char_w
+        
+        y += self.char_h
+    
+    # Draw cursor only if not in view mode
+    if not view_mode:
+        cursor_x, cursor_y = self._find_cursor_position_from_lines(lines, cursor_pos)
+        if cursor_x is not None and cursor_y is not None:
+            self._draw_cursor(cursor_x, cursor_y)
+    
+    # Draw status or mode indicator
+    if view_mode:
+        self._draw_status("[Page View - Press Home to edit]")
+    elif show_status:
+        self._draw_status(show_status)
+    
+    # Refresh
+    if self.partial_refresh_mode:
+        self.partial_refresh()
+    else:
+        self.full_refresh()
+```
+
+### 4. Update Main Refresh Display
+
+In `main.py`, update `_refresh_display`:
+
+```python
+def _refresh_display(self):
+    """Refresh the display with current page"""
+    page = self.document.get_current_page()
+    page_info = self.document.get_page_info()
+    
+    # Build status line
+    if self.in_page_view:
+        status = "Page %d/%d [View]" % (page_info['current'], page_info['total'])
+    else:
+        status = "Page %d/%d" % (page_info['current'], page_info['total'])
+        if self.document.dirty:
+            status += " *"
+    
+    debug("Refreshing display: %s" % status)
+    
+    # Render page with view mode flag
+    self.display.render_page(page, self.document.cursor_pos, status, 
+                           view_mode=self.in_page_view)
+```
+
+These fixes should resolve:
+1. **Space rendering** - by clearing the line cache on every character change
+2. **Navigation state** - by properly tracking view vs edit mode
+3. **Home key behavior** - by returning to the saved editing position
+4. **Visual feedback** - by showing when in page view mode
+
+#6.8.2025:
+Completed:
+> Need to fix issue with overflow and page breaks logic. Will need to review page view in this case as well. 
+> Menu with create new, exit, sleep logic.
+
+TODO:
+> Mount SD Card - not with breakout board.
+
+
+#6.4.2025:
+Completed:
+> Rename file backspace deletes whole word - added comment in file for current state.
+> New file has counter
+    - Finds highest new_file_#.txt
+        - Strips new_file_ and drops .txt
+        - Makes int
+        - Adds 1
+        - Saves new file as new_file_<#+1>.txt
+To Do:
+> Need to fix issue with overflow and page breaks logic. Will need to review page view in this case as well. 
+> Add TW in cursive for Linson by TW
+> Fix SD card mount and read
+    - Add data transfer logic
+> Build this
+    - Screw screen into docs holder
+
+
+
+# 6.3.2025:
+Completed:
+> Fix issue with loading pages
+    - Lines are split/connected where there were previously new lines inserted. 
+> Add sleep loop in file-menu
+    - go straight to deep sleep after 1 minute of inactivity
+> Squish page up/down viewing bug
+    - Load view only on current page first
+    - Then sequence page-up/down using list index in memory
+    - Fix exiting
+
+
+To Do:
+> Add TW in cursive for Linson by TW
+> Fix SD card mount and read
+    - Add data transfer logic
+> Rename file backspace deletes whole word - added comment in file for current state.
+> New file has counter
+    - Finds highest new_file_#.txt
+        - Strips new_file_ and drops .txt
+        - Makes int
+        - Adds 1
+        - Saves new file as new_file_<#+1>.txt
+> Build this
+    - Screw screen into docs holder
+
+
+# 6.1.2025:
+
+Completed:
+- Sleep exit and light sleep exit on button push
+
+To do:
+> Fix issue with loading pages
+    - Lines are split/connected where there were previously new lines inserted. 
+> Add sleep loop in file-menu
+    - go straight to deep sleep after 1 minute of inactivity
+> Squish page up/down viewing bug
+    - Load view only on current page first
+    - Then sequence page-up/down using list index in memory
+    - Fix exiting
+> Add TW in cursive for Linson by TW
+> Fix SD card mount and read
+    - Add data transfer logic
+> Rename file backspace deletes whole word
+> New file has counter
+    - Finds highest new_file_#.txt
+        - Strips new_file_ and drops .txt
+        - Makes int
+        - Adds 1
+        - Saves new file as new_file_<#+1>.txt
+> Build this
+    - Screw screen into docs holder
+    
+    
+    
+    

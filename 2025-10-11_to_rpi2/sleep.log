@@ -1,0 +1,42 @@
+    307485  LS: prepared screen
+    307491  LS: pins in low power mode
+    330648  LS: key detected after 23000ms
+    330662  LS: pins restored
+    330903  LS: keys released
+    330983  LS: restoring display
+    332156  LS: display restored
+
+    396589  LS: prepared screen
+    396781  LS: pins in low power mode
+    661403  LS: key detected after 263500ms
+    661461  LS: pins restored
+    661975  LS: keys released
+    662042  LS: restoring display
+    663238  LS: display restored
+
+    805553  EXCEPTION idle_lightsleep_dbg
+Traceback (most recent call last):
+  File "<stdin>", line 1665, in idle_lightsleep_TW
+  File "<stdin>", line 455, in flush_file
+AttributeError: 'NoneType' object has no attribute 'startswith'
+
+     62000  EXCEPTION idle_lightsleep_dbg
+Traceback (most recent call last):
+  File "<stdin>", line 1665, in idle_lightsleep_TW
+  File "<stdin>", line 455, in flush_file
+AttributeError: 'NoneType' object has no attribute 'startswith'
+
+    806994  LS: prepared screen
+    807148  LS: pins in low power mode
+    882058  LS: key detected after 74500ms
+    882131  LS: pins restored
+    882739  LS: keys released
+    882801  LS: restoring display
+    883997  LS: display restored
+
+    301801  EXCEPTION idle_lightsleep_dbg
+Traceback (most recent call last):
+  File "<stdin>", line 1787, in idle_lightsleep_TW
+  File "<stdin>", line 520, in flush_file
+AttributeError: 'NoneType' object has no attribute 'startswith'
+

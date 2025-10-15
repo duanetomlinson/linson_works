@@ -1,0 +1,8 @@
+"""
+Configuration file for WiFi and API credentials
+Copy from Reference Docs/working_reference/config.py
+"""
+
+WIFI_SSID = "Key West"
+WIFI_PASSWORD = "HouseOfMusic"
+TODOIST_API_TOKEN = "250cf939fac5467a0d35f7797e859d384c1d9bd1"

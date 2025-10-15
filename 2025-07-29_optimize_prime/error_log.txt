@@ -1,0 +1,10 @@
+
+[807060160] idle_lightsleep: AttributeError: 'module' object has no attribute 'gpio_wakeup_enable'
+Traceback (most recent call last):
+  File "<stdin>", line 1077, in idle_lightsleep
+AttributeError: 'module' object has no attribute 'gpio_wakeup_enable'
+
+[807060283] idle_lightsleep: AttributeError: 'module' object has no attribute 'gpio_wakeup_enable'
+Traceback (most recent call last):
+  File "<stdin>", line 1077, in idle_lightsleep
+AttributeError: 'module' object has no attribute 'gpio_wakeup_enable'

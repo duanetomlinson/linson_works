@@ -1,0 +1,20 @@
+ wrap accordingly. I may want thoentence t come along. 
+- the above shoubea nw page - it is. 
+- Now testing page view: e asdleted. 
+
+
+---
+1234567890- This is an explicit page break. The previous papapage was meant to be an overflow butit deletedtthe first page.This edit should allow for word wrapping. and forforforproper pagewrapping. Page saving shouldalalso be complete. Word wrapping might be broken. Test:Test:Wrap. Okso the previous letters stay onthe prior linelineline. That should be  fixed. Where is theursursor for.Page now loads without the new lines  ept added. I need o adjust that.- There should be 2 spaces above this.p
+---
+- This is a new page.Smoother conrol and typing experience.This should have explicit lines above -1.
+
+
+- Trying to preseve new line. WORKED!
+
+- Now testing sleep mode.
+
+- Now testing upload to nion server... cnrl + u
+
+- Failed. Server dowTrying todoist with cntrl t
+
+... Worked.

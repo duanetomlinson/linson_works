@@ -1,0 +1,140 @@
+2025-10-14
+
+<test_master.py test>
+
+notes:
+    on startup of program, the e-ink just lands on white, with no menu showing.
+    
+
+<test_master.py results>
+MPY: soft reboot
+
+=======================================================
+  MASTER PICO 2W HARDWARE INTEGRATION TEST SUITE
+=======================================================
+Date: (2025, 10, 14, 16, 41, 44, 1, 287)
+Board: Raspberry Pi Pico 2W (RP2350)
+=======================================================
+
+[1/12] GPIO Pin Configuration... ✓ PASS (1ms)
+    All 7 GPIO pins accessible
+[2/12] I2C Bus Initialization... ✓ PASS (0ms)
+    I2C1 initialized on GP2/GP3 @ 400kHz
+[3/12] I2C Device Scan... ✓ PASS (7ms)
+    Found 1 device(s): 0x34
+[4/12] TCA8418 Device Detection... ✓ PASS (7ms)
+    TCA8418 detected at 0x34, CFG=0x00
+[5/12] TCA8418 Driver Initialization...INT pin configured on GPPin(GPIO20, mode=IN, pull=PULL_UP)
+RST pin configured on GPPin(GPIO21, mode=OUT)
+Performing hardware reset...
+TCA8418 initialized with CORRECTED register addresses for Linson 10x8 keyboard matrix
+ ✓ PASS (84ms)
+    TCA8418 driver initialized successfully
+[6/12] Keyboard Interrupt Pin (GP20)... ✓ PASS (1ms)
+    INT pin HIGH (idle state) - correct
+[7/12] Keyboard Reset Pin (GP21)... ✓ PASS (20ms)
+    RST pin functional (active high)
+[8/12] Keyboard FIFO Operations... ✓ PASS (1ms)
+    FIFO empty after clear
+[9/12] Power Button Detection (GP22)... ✓ PASS (0ms)
+    Power button released (pulled HIGH)
+[10/12] UART Initialization... ✓ PASS (1ms)
+    UART1 initialized on GP8/GP9 @ 115200 baud
+[11/12] UART Loopback Test... ✗ FAIL (50ms)
+    No loopback data received - connect GP8 to GP9 for this test
+[12/12] JSON Command Serialization... ✓ PASS (1ms)
+    JSON serialization OK (71 bytes)
+
+=======================================================
+  RESULTS: 11/12 PASSED
+  FAILED: 1 tests
+=======================================================
+
+NOTES:
+• For UART loopback test: connect GP8 (TX) to GP9 (RX)
+• Remove loopback wire before connecting to Slave Pico
+• Press keyboard keys to verify physical keyboard connections
+• All tests use I2C1 and UART1 as per wiring guide
+</test_master.py results>
+
+</test_master.py test>
+
+<test_master_unit.py test>
+
+notes: The failed part may be because there should be a saved cursor position, and buffer file txt file for the application to reference. REview the original code. 
+
+<test_master_unit.py results>
+>>> %Run -c $EDITOR_CONTENT
+
+MPY: soft reboot
+
+=======================================================
+  MASTER PICO APPLICATION UNIT TEST SUITE
+=======================================================
+
+═ TextLayout Tests ═
+Testing: Word boundaries (simple)... ✓ PASS
+  Found 'Hello' at position 0-5
+Testing: Word boundaries (with spaces)... ✓ PASS
+  Skipped leading spaces, found 'Hello'
+Testing: Calculate lines (single line)... ✓ PASS
+  Single line with 5 characters
+Testing: Calculate lines (word wrap)... ✓ PASS
+  Text wrapped to 2 lines
+Testing: Calculate lines (newline)... ✓ PASS
+  Newline created 2 lines
+Testing: Calculate lines (empty)... ✓ PASS
+  Empty text produced no lines
+Testing: Screen pages (single page)... ✓ PASS
+  Text fits on single page
+Testing: Screen pages (multiple pages)... ✓ PASS
+  Text split into 2 pages
+Testing: Cursor position (start)... ✓ PASS
+  Cursor at start: (5, 5), page 0
+Testing: Cursor position (end)... ✓ PASS
+  Cursor at end: (45, 5)
+Testing: Cursor position (after newline)... ✗ FAIL
+  Expected (5, 20, 0), got (45, 5, 0)
+
+═ Text Editing Logic Tests ═
+Testing: Insert character... ✓ PASS
+  Inserted space: 'Hello '
+Testing: Backspace deletion... ✓ PASS
+  Backspace OK: 'Hell'
+Testing: Delete word... ✓ PASS
+  Deleted word: 'Hello '
+
+═ Power Management Tests ═
+Testing: Screensaver timeout... ✓ PASS
+  Timeout correctly set to 120.0 seconds (2 minutes)
+Testing: Auto-off timeout... ✓ PASS
+  Timeout correctly set to 300.0 seconds (5 minutes)
+Testing: Idle detection logic... ✓ PASS
+  Idle time 120000ms exceeds threshold 120000ms
+
+═ Key Processing Tests ═
+Testing: Glyph conversion (lowercase)... ✓ PASS
+  'A' → 'a' (lowercase)
+Testing: Glyph conversion (uppercase)... ✓ PASS
+  'a' + Shift → 'A' (uppercase)
+Testing: Glyph conversion (punctuation)... ✓ PASS
+  '1' + Shift → '!'
+Testing: Space key handling... ✓ PASS
+  'Space' → ' ' (space character)
+
+═ File Operations Tests ═
+Testing: Page split logic... ✓ PASS
+  Split into 3 pages
+Testing: Page join logic... ✓ PASS
+  Joined 3 pages with markers
+
+=======================================================
+  RESULTS: 22/23 PASSED
+  FAILED: 1 tests
+=======================================================
+
+>>> 
+
+</test_master_unit.py results>
+
+</test_master.py test>
